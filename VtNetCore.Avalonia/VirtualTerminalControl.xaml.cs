@@ -614,8 +614,14 @@ namespace VtNetCore.Avalonia
                 return;
 
             }
-            var dipToDpiRatio = 96 / 96; // TODO read screen dpi.
+            var dipToDpiRatio = 96 / 96;
 
+            if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                var size = desktop.MainWindow.Screens.Primary.Bounds.Size;
+                dipToDpiRatio = Convert.ToInt32(desktop.MainWindow.Screens.Primary.Scaling);
+
+            }
             double lineY = 0;
             foreach (var textRow in spans)
             {
