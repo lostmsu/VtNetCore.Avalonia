@@ -901,7 +901,7 @@ namespace VtNetCore.Avalonia
         private void ResizeTerminal()
         {
             Terminal?.ResizeView(Columns, Rows);
-            InvalidateMeasure();
+            Dispatcher.UIThread.Post(InvalidateMeasure);
         }
 
         TextPosition MouseOver { get; set; } = new TextPosition();
