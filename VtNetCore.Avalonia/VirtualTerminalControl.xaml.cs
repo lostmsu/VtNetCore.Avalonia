@@ -96,11 +96,27 @@ namespace VtNetCore.Avalonia
 
         public double CharacterWidth { get; private set; } = -1;
         public double CharacterHeight { get; private set; } = -1;
-        public int Columns { get; private set; } = -1;
-        public int Rows { get; private set; } = -1;
+        public static readonly StyledProperty<int> ColumnsProperty =
+            AvaloniaProperty.Register<VirtualTerminalControl, int>(nameof(Columns), defaultValue: -1);
+        public static readonly StyledProperty<int> RowsProperty =
+            AvaloniaProperty.Register<VirtualTerminalControl, int>(nameof(Rows), defaultValue: -1);
+
+        public int Columns {
+            get => GetValue(ColumnsProperty);
+            set => SetValue(ColumnsProperty, value);
+        }
+        public int Rows {
+            get => GetValue(RowsProperty);
+            set => SetValue(RowsProperty, value);
+        }
         public DataConsumer Consumer { get; set; }
         public int ViewTop { get; set; } = 0;
-        public string WindowTitle { get; set; } = "Session";
+        public static readonly StyledProperty<string> WindowTitleProperty =
+            AvaloniaProperty.Register<VirtualTerminalControl, string>(nameof(WindowTitle), defaultValue: "Session");
+        public string WindowTitle {
+            get => GetValue(WindowTitleProperty);
+            set => SetValue(WindowTitleProperty, value);
+        }
 
         public bool ViewDebugging { get; set; }
         public bool DebugMouse { get; set; }
@@ -152,8 +168,6 @@ namespace VtNetCore.Avalonia
                         Consumer = null;
                     }
 
-                    Columns = -1;
-                    Rows = -1;
                     InputBuffer = "";
                     TerminalIdleSince = DateTime.Now;
                     _rawTextChanged = false;
@@ -179,6 +193,10 @@ namespace VtNetCore.Avalonia
                         
                         terminal.StoreRawText = true;
                         this._terminal = terminal;
+                        if (Columns > 0 && Rows > 0)
+                        {
+                            ResizeTerminal();
+                        }
                     }
                 });
 
@@ -203,6 +221,14 @@ namespace VtNetCore.Avalonia
                     connection.SetTerminalWindowSize(Columns, Rows, 800, 600);
                 }
             });
+
+            this.GetObservable(ColumnsProperty)
+                .ObserveOn(AvaloniaScheduler.Instance)
+                .Subscribe(_ => ResizeTerminal());
+            
+            this.GetObservable(RowsProperty)
+                .ObserveOn(AvaloniaScheduler.Instance)
+                .Subscribe(_ => ResizeTerminal());
         }
 
         public static readonly StyledProperty<IConnection> ConnectionProperty =
@@ -221,6 +247,21 @@ namespace VtNetCore.Avalonia
         {
             get => GetValue(TerminalProperty);
             set => SetValue(TerminalProperty, value);
+        }
+        
+        public static readonly StyledProperty<bool> SizeToContentProperty =
+            AvaloniaProperty.Register<VirtualTerminalControl, bool>(
+                nameof(SizeToContent), defaultValue: true);
+        public bool SizeToContent
+        {
+            get => GetValue(SizeToContentProperty);
+            set => SetValue(SizeToContentProperty, value);
+        }
+
+        protected override Size MeasureOverride(Size availableSize) {
+            base.MeasureOverride(availableSize);
+            
+            return new Size(Columns * CharacterWidth, Rows * CharacterHeight);
         }
 
         protected override void OnGotFocus(GotFocusEventArgs e)
@@ -841,11 +882,12 @@ namespace VtNetCore.Avalonia
             {
                 CharacterWidth = size.Width;
                 CharacterHeight = size.Height;
+                Dispatcher.UIThread.Post(InvalidateMeasure);
             }
 
             int columns = Convert.ToInt32(Math.Floor(Bounds.Size.Width / CharacterWidth));
             int rows = Convert.ToInt32(Math.Floor(Bounds.Size.Height / CharacterHeight));
-            if (Columns != columns || Rows != rows)
+            if (SizeToContent && (Columns != columns || Rows != rows))
             {
                 Columns = columns;
                 Rows = rows;
@@ -859,6 +901,7 @@ namespace VtNetCore.Avalonia
         private void ResizeTerminal()
         {
             Terminal?.ResizeView(Columns, Rows);
+            InvalidateMeasure();
         }
 
         TextPosition MouseOver { get; set; } = new TextPosition();
